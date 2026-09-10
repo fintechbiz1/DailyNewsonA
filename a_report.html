@@ -3,8 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 갱신 후 옛 내용이 보이지 않도록 캐시를 막는다 (강력 새로고침 불필요) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Apple Card 동향 리포트</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -33,15 +38,16 @@
             position: absolute; top: 22px; right: 24px;
             display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
         }
-        #refreshBtn {
+        .btn-row { display: flex; gap: 8px; }
+        #refreshBtn, #pdfBtn {
             padding: 10px 18px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.45);
             background: rgba(255,255,255,0.16); color: #fff;
             font-size: 0.86em; font-weight: 600; cursor: pointer;
-            font-family: inherit; backdrop-filter: blur(2px);
+            font-family: inherit; backdrop-filter: blur(2px); white-space: nowrap;
             transition: background 0.2s ease, opacity 0.2s ease;
         }
-        #refreshBtn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
-        #refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; border-style: dashed; }
+        #refreshBtn:hover:not(:disabled), #pdfBtn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
+        #refreshBtn:disabled, #pdfBtn:disabled { opacity: 0.5; cursor: not-allowed; border-style: dashed; }
         #refreshMsg {
             font-size: 0.76em; color: rgba(255,255,255,0.92);
             max-width: 260px; text-align: right; line-height: 1.5; min-height: 1em;
@@ -168,17 +174,31 @@
             .refresh-box { position: static; align-items: center; margin-bottom: 18px; }
             #refreshMsg { text-align: center; }
         }
+
+        /* --- 인쇄 / PDF 저장 --- */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .container { box-shadow: none; border-radius: 0; max-width: none; }
+            .refresh-box { display: none; }
+            .news-item, .ticker, .highlight-box { break-inside: avoid; page-break-inside: avoid; }
+            .section { break-inside: auto; }
+            .section-title { break-after: avoid; page-break-after: avoid; }
+            .news-link { display: none; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="refresh-box">
-                <button id="refreshBtn" disabled>확인 중...</button>
+                <div class="btn-row">
+                    <button id="pdfBtn">PDF 다운로드</button>
+                    <button id="refreshBtn" disabled>확인 중...</button>
+                </div>
                 <div id="refreshMsg"></div>
             </div>
             <h1>Apple Card / Savings / Upgrade 동향</h1>
-            <p>2026-09-10 16:09 (KST) 기준 · 외신 기사 자동 브리핑</p>
+            <p>2026-09-10 16:33 (KST) 기준 · 외신 기사 자동 브리핑</p>
         </div>
 
         <div class="content">
@@ -382,7 +402,7 @@
         </div>
 
         <div class="footer">
-            <p>마지막 갱신 2026-09-10 16:09 (KST) · 우측 상단 버튼으로 하루 1회 갱신</p>
+            <p>마지막 갱신 2026-09-10 16:33 (KST) · 우측 상단 버튼으로 하루 1회 갱신</p>
             <p>이번 회차 링크 검증: 0건 확인 · 0건 접속 실패로 제외 ·
             리포트에 실린 링크는 전부 HTTP 200 확인을 통과했습니다.</p>
             <p>인용빈도는 Google News 검색 결과에서 제목이 유사한 기사를 집계한 근사치입니다.</p>
@@ -444,6 +464,49 @@
                 }
             }
         });
+    </script>
+    <script>
+(function () {
+  var btn = document.getElementById('pdfBtn');
+  var box = document.querySelector('.refresh-box');
+  var stamp = '20260910';
+
+  function reset(label) {
+    btn.disabled = false;
+    btn.textContent = label || 'PDF 다운로드';
+  }
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>PDF 생성 중...';
+
+    // 라이브러리를 못 받아온 경우(오프라인·CDN 차단) 브라우저 인쇄로 대체
+    if (typeof html2pdf === 'undefined') {
+      reset();
+      window.print();
+      return;
+    }
+
+    var el = document.querySelector('.container');
+    var prev = box.style.display;
+    box.style.display = 'none';   // 버튼은 PDF에 넣지 않는다
+
+    html2pdf().set({
+      margin: [8, 8, 10, 8],
+      filename: 'AppleCard_동향리포트_' + stamp + '.pdf',
+      image: { type: 'jpeg', quality: 0.96 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'avoid-all'] }
+    }).from(el).save()
+      .then(function () { box.style.display = prev; reset(); })
+      .catch(function () {
+        box.style.display = prev;
+        reset('PDF 다운로드');
+        window.print();   // 실패하면 인쇄 대화상자로
+      });
+  });
+})();
     </script>
     <script>
 (function () {
